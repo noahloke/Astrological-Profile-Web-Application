@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+    
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="loginPage" class="center" style="display: block;">
+        <h1><img src="images/title.png" alt="title" width="410" height="85"></h1>
+        <form style="padding: 20px;">
+            <div class="txt_field">
+                <label for="username">
+                    <input type="text" id="username" name="username" required>
+                    <span></span>
+                    <label>Email</label>
+                    <div class="icon"><img src="images/userIcon.jpg" width="13px" id="userIcon"></div>
+            </div>
+            <div class="txt_field">
+                    <label for="password">
+                        <input type="password" id="password" name="password" required>
+                        <span></span>
+                        <label>Password</label> 
+                        <div class="icon"><img src="images/eye-close.png" width="15px" id="eyeIcon"></div>
+            </div>
+
+            <div class="button-row" style="margin-top: 20px;">
+                <button type="button" onclick="login()">Log In</button>
+                <button type="button" onclick="loginSSO()">Sign-In with Google</button>
+                <div class="signup_link">
+                    Not a member? <a href="#" onclick="signUp()">Sign up</a>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div id="signupPage" class="center" style="display: none">
+        <h1><img src="images/title.png" alt="title" width="410" height="85"></h1>
+        <form style="padding: 20px;">
+            <div class="txt_field">
+                <label for="username">
+                    <input type="text" id="usernameS" name="username" required>
+                    <span></span>
+                    <label>Email</label>
+                    <div class="icon"><img src="images/userIcon.jpg" width="13px" id="userIcon"></div>
+            </div>
+            <div class="txt_field">
+                    <label for="password">
+                        <input type="password" id="passwordS" name="password" required>
+                        <span></span>
+                        <label>Password</label>
+                        <div class="icon"><img src="images/eye-close.png" width="15px" id="eyeIcon2"></div>
+            </div>
+            <div><input type="date" id="birthdateS" placeholder="YYYY-MM-DD">
+            </div>
+            <div class="button-row" style="margin-top: 20px;">
+                <button type="button" onclick="done()">Sign Up</button>
+                <button type="button" onclick="logout()">Cancel</button>
+            </div>
+        </form>
+    </div>
+    <div id="birthdayPage" class="container" style="display: none;">
+        <img src="images/title.png" alt="title" width="410" height="85">
+        <div id="profile" class="profile"></div>
+        <hr class="divider">
+        <h3>Try Other Birthdays:</h3>
+        <ul id="otherBirthdaysList"></ul>
+        <input type="date" id="birthdate" placeholder="YYYY-MM-DD">
+        <button onclick="displayReport()">Create Report</button>
+        <div id="result" class="result"></div>
+        <br>
+    <button onclick="logout()">Logout</button>
+    </div>
+
+    <script src="script.js"></script>
+
+    <script type="module">
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+        import { getDatabase, ref, push, onValue, set, get } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
+        import { getAuth, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+
+
+        const firebaseConfig = {
+            apiKey: "",
+            authDomain: "",
+            databaseURL: "",
+            projectId: "",
+            storageBucket: "",
+            messagingSenderId: "",
+            appId: ""
+        };
+        const provider = new GoogleAuthProvider();
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const auth = getAuth(app);
+        let user;  // Declare user variable
+
+        // Set up an observer to listen for changes in authentication state
+        onAuthStateChanged(auth, (authUser) => {
+            user = authUser;
+        });
+
+        window.loginSSO = async () => {
+            try {
+                // Sign in with a popup window and use GoogleAuthProvider for authentication
+                const result = await signInWithPopup(auth, provider);
+                // This gives you a Google Access Token. You can use it to access Google APIs.
+                const credential = GoogleAuthProvider.credentialFromResult(result);
+                const token = credential.accessToken;
+                // The signed-in user info
+                const user = result.user;
+
+                console.log(user);
+                alert('Google SSO login successful!');
+
+                // You can retrieve or store user data in your database if needed
+                const userBirthdatesRef = ref(database, `users/${user.uid}`);
+                const snapshot = await get(userBirthdatesRef);
+                if (snapshot.exists()) {
+                    const birthdate = snapshot.val().birthdate;
+                    createReport(birthdate, true);
+                }
+
+                document.getElementById('loginPage').style.display = 'none';
+                document.getElementById('birthdayPage').style.display = 'block';
+            } catch (error) {
+                console.error(error.message);
+                alert('Google SSO login failed. Please try again.');
+            }
+        };
+
+        window.login = async () => {
+            const loginEmail = document.getElementById('username').value;
+            const loginPassword = document.getElementById('password').value;
+
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+                console.log(userCredential.user);
+                alert('Login successful!');
+
+                const userBirthdatesRef = ref(database, `users/${userCredential.user.uid}`);
+                const snapshot = await get(userBirthdatesRef);
+                if (snapshot.exists()) {
+                    const birthdate = snapshot.val().birthdate;
+                    createReport(birthdate, true);
+                }
+
+                document.getElementById('loginPage').style.display = 'none';
+                document.getElementById('birthdayPage').style.display = 'block';
+            } catch (error) {
+                console.error(error.message);
+                alert('Login failed. Please check your username and password.');
+            }
+        };
+
+
+        window.signUp = async () => {
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('signupPage').style.display = 'block';
+
+        }
+
+        window.done = async () => {
+            const signUpEmail = document.getElementById('usernameS').value;
+            const signUpPassword = document.getElementById('passwordS').value;
+            const birthdate = document.getElementById('birthdateS').value;
+            const currentTime = new Date().toISOString();
+
+            try {
+                // Create user in Firebase Authentication
+                const userCredential = await createUserWithEmailAndPassword(auth, signUpEmail, signUpPassword);
+                console.log(userCredential.user);
+                const userBirthdatesRef = ref(database, `users/${user.uid}`);
+
+                set(userBirthdatesRef, {
+                    birthdate: birthdate,
+                    timestamp: currentTime
+                });
+                alert('Sign up successful!');
+                document.getElementById('loginPage').style.display = 'block';
+                document.getElementById('signupPage').style.display = 'none';
+            } catch (error) {
+                console.error(error.message);
+                alert('Sign up failed. Please try again.');
+            }
+        }
+
+        window.displayReport = function () {
+            const birthdate = document.getElementById('birthdate').value;
+            createReport(birthdate, false);
+        };
+
+        window.logout = function () {
+            document.getElementById('loginPage').style.display = 'block';
+            document.getElementById('birthdayPage').style.display = 'none';
+            document.getElementById('signupPage').style.display = 'none';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('birthdate').value = '';
+            document.getElementById('result').innerHTML = '';
+            document.getElementById('result2').innerHTML = '';
+        };
+
+        let eyeicon = document.getElementById("eyeIcon")
+        let password = document.getElementById("password")
+        let eyeicon2 = document.getElementById("eyeIcon2")
+        let password2 = document.getElementById("passwordS")
+        eyeicon.onclick = function () {
+            if (password.type == "password") {
+                password.type = "text";
+                eyeicon.src = "images/eye-open.png"
+            } else {
+                password.type = "password";
+                eyeicon.src = "images/eye-close.png"
+            }
+
+        };
+        eyeicon2.onclick = function () {
+            if (password2.type == "password") {
+                password2.type = "text";
+                eyeicon2.src = "images/eye-open.png"
+            } else {
+                password2.type = "password";
+                eyeicon2.src = "images/eye-close.png"
+            }
+
+        };
+    </script>
+</body>
+
+</html>
